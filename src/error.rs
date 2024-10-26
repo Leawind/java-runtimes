@@ -14,9 +14,8 @@ impl Error {
 
 #[derive(Debug)]
 pub(crate) enum ErrorKind {
-    HomeDirNotFound,
+    InvalidWorkDir,
     NoJavaVersionStringFound,
-    SemverParseFailed(semver::Error),
     LooksNotLikeJavaExecutableFile(PathBuf),
     JavaOutputFailed(std::io::Error),
     GettingJavaVersionFailed(PathBuf),
@@ -25,9 +24,8 @@ pub(crate) enum ErrorKind {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.kind {
-            ErrorKind::HomeDirNotFound => write!(f, "Java home directory not found"),
+            ErrorKind::InvalidWorkDir => write!(f, "Java home directory not found"),
             ErrorKind::NoJavaVersionStringFound => write!(f, "Invalid version string"),
-            ErrorKind::SemverParseFailed(err) => write!(f, "Failed to parse semver: {}", err),
             ErrorKind::LooksNotLikeJavaExecutableFile(path) => {
                 write!(
                     f,

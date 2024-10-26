@@ -6,19 +6,17 @@ mod tests;
 
 use crate::error::{Error, ErrorKind};
 use regex::Regex;
-use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::str::FromStr;
 
 /// Struct [`JavaRuntime`] Represents a java runtime in specific path.
 ///
-/// To detect java runtimes from specific path in filesystem, see [`crate::detector`]
+/// To detect java runtimes from specific path in filesystem, see [`detector`]
 ///
-/// ## Examples
+/// # Examples
 ///
 /// ```rs
 /// JavaRuntime::from_java_exe(r"D:\java\jdk-17.0.4.1\bin\java.exe".as_ref());
@@ -50,36 +48,30 @@ impl JavaRuntime {
 
     /// Mannually create a [`JavaRuntime`] instance, without checking if it's available
     ///
-    /// ## Argument
+    /// # Argument
     ///
     /// * `os` Got from [`env::consts::OS`]
     /// * `path` The path of java executable file, can be either relative or absolute
     /// * `version_string` can be like `"17.0.4.1"` or the output of command `java -version`
     ///
+    /// # Examples
     ///
-    /// ## Command `java -version` output Examples
+    /// ```rust
+    /// use java_runtimes::JavaRuntime;
+    /// use std::env;
+    /// use std::path::Path;
     ///
-    /// ```txt
-    /// java version "1.8.0_333"
-    /// Java(TM) SE Runtime Environment (build 1.8.0_333-b02)
-    /// Java HotSpot(TM) 64-Bit Server VM (build 25.333-b02, mixed mode)
-    /// ```
-    ///
-    /// ```txt
-    /// java version "17.0.4.1" 2022-08-18 LTS
+    /// let java_exe_path = Path::new("../java/jdk-17.0.4.1/bin/java");
+    /// let version_outputs = r#"java version "17.0.4.1" 2022-08-18 LTS
     /// Java(TM) SE Runtime Environment (build 17.0.4.1+1-LTS-2)
     /// Java HotSpot(TM) 64-Bit Server VM (build 17.0.4.1+1-LTS-2, mixed mode, sharing)
-    /// ```
-    ///
-    /// ```txt
-    /// java version "21.0.3" 2024-04-16 LTS
-    /// Java(TM) SE Runtime Environment (build 21.0.3+7-LTS-152)
-    /// Java HotSpot(TM) 64-Bit Server VM (build 21.0.3+7-LTS-152, mixed mode, sharing)
+    /// "#;
+    /// let runtime = JavaRuntime::new(env::consts::OS, java_exe_path, version_outputs).unwrap();
+    /// assert_eq!(runtime.get_version_string(), "17.0.4.1");
+    /// assert!(runtime.is_same_os());
     /// ```
     pub fn new(os: &str, path: &Path, version_string: &str) -> Result<Self, Error> {
         let version_string = Self::extract_version(version_string)?;
-        Version::from_str(&version_string)
-            .map_err(|e| Error::new(ErrorKind::SemverParseFailed(e)))?;
         Ok(Self {
             os: os.to_string(),
             path: path.to_path_buf(),
@@ -100,30 +92,49 @@ impl JavaRuntime {
     ///
     /// It can be absolute or relative, depends on how you created it.
     ///
-    /// ## Examples
+    /// # Examples
     ///
     /// * `D:\Java\jdk-17.0.4.1\bin\java.exe` (Windows, absolute)
     /// * `../../runtimes/jdk-1.8.0_291/bin/java` (Linux, relative)
     pub fn get_executable(&self) -> &Path {
         &self.path
     }
-    /// Is the path relative
-    pub fn is_relative(&self) -> bool {
-        self.path.is_relative()
+
+    /// Returns `true` if the `Path` has a root.
+    ///
+    /// Refer to [`Path::has_root`]
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use java_runtimes::JavaRuntime;
+    ///
+    /// let runtime = JavaRuntime::new("linux", "/jdk/bin/java".as_ref(), "21.0.3").unwrap();
+    /// assert!(runtime.has_root());
+    ///
+    /// let runtime = JavaRuntime::new("windows", r"D:\jdk\bin\java.exe".as_ref(), "21.0.3").unwrap();
+    /// assert!(runtime.has_root());
+    ///
+    /// let runtime = JavaRuntime::new("linux", "../jdk/bin/java".as_ref(), "21.0.3").unwrap();
+    /// assert!(!runtime.has_root());
+    ///
+    /// let runtime = JavaRuntime::new("windows", r"..\jdk\bin\java.exe".as_ref(), "21.0.3").unwrap();
+    /// assert!(!runtime.has_root());
+    /// ```
+    pub fn has_root(&self) -> bool {
+        self.path.has_root()
     }
-    /// Is the path absolute
-    pub fn is_absolute(&self) -> bool {
-        self.path.is_absolute()
-    }
-    pub fn get_version(&self) -> Version {
-        Version::from_str(&self.version_string).unwrap()
-    }
+
     /// Get the version string
     ///
-    /// ## Examples
+    /// # Examples
     ///
-    /// * `"1.8.0_333"`
-    /// * `"17.0.4.1"`
+    /// ```rust
+    /// use java_runtimes::JavaRuntime;
+    ///
+    /// let runtime = JavaRuntime::new("linux", "/jdk/bin/java".as_ref(), "21.0.3").unwrap();
+    /// assert_eq!(runtime.get_version_string(), "21.0.3");
+    /// ```
     pub fn get_version_string(&self) -> &str {
         &self.version_string
     }
@@ -135,11 +146,16 @@ impl JavaRuntime {
 
     /// Create a new [`JavaRuntime`] with absolute path.
     ///
-    /// ## Error
+    /// # Errors
     ///
-    /// * Cannot find home directory
+    /// Returns an [`Err`] if the current working directory value is invalid. Refer to [`env::current_dir`]
+    ///
+    /// Possible cases:
+    ///
+    /// * Current directory does not exist.
+    /// * There are insufficient permissions to access the current directory.
     pub fn to_absolute(&self) -> Result<Self, Error> {
-        let cwd = env::current_dir().or(Err(Error::new(ErrorKind::HomeDirNotFound)))?;
+        let cwd = env::current_dir().or(Err(Error::new(ErrorKind::InvalidWorkDir)))?;
         let path_absolute = self.path.join(cwd);
         let new_runtime = Self::new(&self.os, &path_absolute, &self.version_string)?;
         Ok(new_runtime)
@@ -165,7 +181,9 @@ impl JavaRuntime {
             self.version_string = Self::extract_version(&version_output)?;
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::GettingJavaVersionFailed(self.path.clone())))
+            Err(Error::new(ErrorKind::GettingJavaVersionFailed(
+                self.path.clone(),
+            )))
         }
     }
 
@@ -178,20 +196,21 @@ impl JavaRuntime {
 
     /// Parse version string
     ///
-    /// ## Return
+    /// # Return
     ///
     /// `(version_string, version_major)`
     ///
-    /// ## Examples
+    /// # Examples
     ///
-    /// ```rs
-    /// extract_version("1.8.0_333")     // Ok("1.8.0_333", 1)
-    /// extract_version("17.0.4.1")     // Ok("17.0.4.1", 17)
-    /// extract_version("\"17.0.4.1\"") // Ok("17.0.4.1", 17)
-    /// extract_version("java version \"17.0.4.1\"") // Ok("17.0.4.1", 17)
-    /// extract_version("17")           // Err("Bad java version string: '\"17\"'")
+    /// ```rust
+    /// use java_runtimes::JavaRuntime;
+    ///
+    /// assert_eq!(JavaRuntime::extract_version("1.8.0_333").unwrap(), "1.8.0_333");
+    /// assert_eq!(JavaRuntime::extract_version("17.0.4.1").unwrap(), "17.0.4.1");
+    /// assert_eq!(JavaRuntime::extract_version("\"17.0.4.1").unwrap(), "17.0.4.1");
+    /// assert_eq!(JavaRuntime::extract_version("java version \"17.0.4.1\"").unwrap(), "17.0.4.1");
     /// ```
-    fn extract_version(version_string: &str) -> Result<String, Error> {
+    pub fn extract_version(version_string: &str) -> Result<String, Error> {
         Ok(Regex::new(Self::VERSION_PATTERN)
             .unwrap()
             .captures(&format!("\"{}\"", &version_string))
@@ -232,7 +251,7 @@ impl JavaRuntime {
         false
     }
 
-    /// ## Examples
+    /// # Examples
     /// * `java.exe` (windows)
     /// * `java` (linux)
     fn get_java_executable_name() -> OsString {
@@ -241,18 +260,17 @@ impl JavaRuntime {
         java_exe
     }
 }
-
-impl PartialEq for JavaRuntime {
-    fn eq(&self, other: &Self) -> bool {
-        self.os == other.os && self.path == other.path
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
-    }
-}
-
 impl Clone for JavaRuntime {
+    /// # Examples
+    ///
+    /// ```rust
+    /// use java_runtimes::JavaRuntime;
+    ///
+    /// let r1 = JavaRuntime::new("linux", "/jdk/bin/java".as_ref(), "21.0.3").unwrap();
+    /// let r2 = r1.clone();
+    ///
+    /// assert_eq!(r1, r2);
+    /// ```
     fn clone(&self) -> Self {
         Self {
             os: self.os.clone(),
@@ -260,9 +278,46 @@ impl Clone for JavaRuntime {
             version_string: self.version_string.clone(),
         }
     }
+    /// # Examples
+    ///
+    /// ```rust
+    /// use java_runtimes::JavaRuntime;
+    ///
+    /// let mut r1 = JavaRuntime::new("windows", "/jdk/bin/java".as_ref(), "21.0.3").unwrap();
+    /// let r2 = JavaRuntime::new("windows", r"D:\jdk\bin\java.exe".as_ref(), "21.0.3").unwrap();
+    ///
+    /// r1.clone_from(&r2);
+    /// assert_eq!(r1, r2);
+    /// ```
     fn clone_from(&mut self, source: &Self) {
         self.os = source.os.clone();
         self.path = source.path.clone();
         self.version_string = source.version_string.clone();
+    }
+}
+
+impl PartialEq for JavaRuntime {
+    /// # Examples
+    ///
+    /// ```rust
+    /// use java_runtimes::JavaRuntime;
+    ///
+    /// let r1 = JavaRuntime::new("linux", "/jdk/bin/java".as_ref(), "21.0.3").unwrap();
+    /// let r2 = JavaRuntime::new("linux", "/jdk/bin/java".as_ref(), "21.0.3").unwrap();
+    /// let r3 = JavaRuntime::new("windows", r"D:\jdk\bin\java.exe".as_ref(), "21.0.3").unwrap();
+    /// let r4 = JavaRuntime::new("windows", r"D:\jdk-17\bin\java.exe".as_ref(), "21.0.3").unwrap();
+    ///
+    /// assert_eq!(r1, r2);
+    /// assert_ne!(r1, r3);
+    /// assert_ne!(r2, r3);
+    /// assert_ne!(r2, r4);
+    /// assert_ne!(r3, r4);
+    /// ```
+    fn eq(&self, other: &Self) -> bool {
+        self.os == other.os && self.path == other.path
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
     }
 }
