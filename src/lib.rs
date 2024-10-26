@@ -4,19 +4,26 @@
 //!
 //! # Examples
 //!
+
+//! Detect Java runtime from environment variables
+//!
 //! ```rust
-//! use java_runtimes::{detector, JavaRuntime};
-//! use std::path::Path;
+//! use java_runtimes::detector;
 //!
-//! let mut runtimes: Vec<JavaRuntime> = detector::detect_java_in_environments();
+//! let runtimes = detector::detect_java_in_environments();
+//! println!("Detected Java runtimes: {:?}", runtimes);
+//! ```
 //!
-//! let paths = vec![
-//!     Path::new("/usr"),
-//!     Path::new("/opt"),
-//! ];
-//! detector::gather_java_in_paths(&mut runtimes, &paths, 2);
+//! Detect Java runtimes recursively within multiple paths
 //!
-//! println!("Detected Java runtimes: {:#?}", runtimes);
+//! ```rust
+//! use java_runtimes::detector;
+//!
+//! let runtimes = detector::detect_java_in_paths(&[
+//!     "/usr".as_ref(),
+//!     "/opt".as_ref(),
+//! ], 2);
+//! println!("Detected Java runtimes in multiple paths: {:?}", runtimes);
 //! ```
 
 pub mod detector;

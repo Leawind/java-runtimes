@@ -1,35 +1,37 @@
-//! This module provides functionality to detect available Java runtimes from given path(s).
+//! This module provides functions for detecting available Java runtimes from given path(s).
 //!
 //! The detected java runtimes are represented by the [`JavaRuntime`] struct.
 //!
-//!
 //! # Examples
 //!
-//! Here are some examples demonstrating how to use the functions provided by this module:
+//! Detect Java runtime from environment variables
 //!
 //! ```rust
-//! use java_runtimes::JavaRuntime;
 //! use java_runtimes::detector;
-//! use std::path::Path;
 //!
-//! // Detect Java runtimes recursively within a path
-//! let search_path = Path::new("/usr");
-//! let runtimes = detector::detect_java(search_path, 2);
+//! let runtimes = detector::detect_java_in_environments();
 //! println!("Detected Java runtimes: {:?}", runtimes);
+//! ```
 //!
-//! // Detect Java runtimes recursively within multiple paths
-//! let paths = vec![
-//!     Path::new("/usr"),
-//!     Path::new("/opt"),
-//! ];
-//! let runtimes = detector::detect_java_in_paths(&paths, 2);
+//! Detect Java runtimes recursively within a path
+//!
+//! ```rust
+//! use java_runtimes::detector;
+//!
+//! let runtimes = detector::detect_java("/usr".as_ref(), 2);
+//! println!("Detected Java runtimes: {:?}", runtimes);
+//! ```
+//!
+//! Detect Java runtimes recursively within multiple paths
+//!
+//! ```rust
+//! use java_runtimes::detector;
+//!
+//! let runtimes = detector::detect_java_in_paths(&[
+//!     "/usr".as_ref(),
+//!     "/opt".as_ref(),
+//! ], 2);
 //! println!("Detected Java runtimes in multiple paths: {:?}", runtimes);
-//!
-//! // Detect Java runtime from an executable path
-//! let exe_path = Path::new("/usr/bin/java");
-//! if let Some(runtime) = detector::detect_java_exe(exe_path) {
-//!     println!("Detected Java runtime: {:?}", runtime);
-//! }
 //! ```
 
 use crate::JavaRuntime;
