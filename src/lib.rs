@@ -1,8 +1,26 @@
+//! `java-runtimes` is a rust library for detecting java runtimes in current system.
+//!
+//! * To detect java runtimes, see [`detector`]
+//!
+//! # Examples
+//!
+//! ```rust
+//! use java_runtimes::{detector, JavaRuntime};
+//! use std::path::Path;
+//!
+//! let mut runtimes: Vec<JavaRuntime> = detector::detect_java_in_environments();
+//!
+//! let paths = vec![
+//!     Path::new("/usr"),
+//!     Path::new("/opt"),
+//! ];
+//! detector::gather_java_in_paths(&mut runtimes, &paths, 2);
+//!
+//! println!("Detected Java runtimes: {:#?}", runtimes);
+//! ```
+
 pub mod detector;
 pub mod error;
-
-#[cfg(test)]
-mod tests;
 
 use crate::error::{Error, ErrorKind};
 use regex::Regex;
@@ -14,14 +32,7 @@ use std::process::Command;
 
 /// Struct [`JavaRuntime`] Represents a java runtime in specific path.
 ///
-/// To detect java runtimes from specific path in filesystem, see [`detector`]
-///
-/// # Examples
-///
-/// ```rs
-/// JavaRuntime::from_java_exe(r"D:\java\jdk-17.0.4.1\bin\java.exe".as_ref());
-/// JavaRuntime::from_java_exe(r"../../runtimes/jdk-1.8.0_291/bin/java".as_ref());
-/// ```
+/// To detect java runtimes from specific path, see [`detector`]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JavaRuntime {
     os: String,
@@ -36,7 +47,20 @@ impl JavaRuntime {
     /// Create a [`JavaRuntime`] object from the path of java executable file
     ///
     /// It executes command `java -version` to get the version information
-    pub fn from_java_exe(path: &Path) -> Result<Self, Error> {
+    ///
+    /// # Parameters
+    ///
+    /// * `path` Path to java executable file.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use java_runtimes::JavaRuntime;
+    ///
+    /// let _ = JavaRuntime::from_executable(r"D:\java\jdk-17.0.4.1\bin\java.exe".as_ref());
+    /// let _ = JavaRuntime::from_executable(r"../../runtimes/jdk-1.8.0_291/bin/java".as_ref());
+    /// ```
+    pub fn from_executable(path: &Path) -> Result<Self, Error> {
         let mut java = Self {
             os: env::consts::OS.to_string(),
             path: path.to_path_buf(),
@@ -48,7 +72,7 @@ impl JavaRuntime {
 
     /// Mannually create a [`JavaRuntime`] instance, without checking if it's available
     ///
-    /// # Argument
+    /// # Parameters
     ///
     /// * `os` Got from [`env::consts::OS`]
     /// * `path` The path of java executable file, can be either relative or absolute
@@ -191,7 +215,7 @@ impl JavaRuntime {
     ///
     /// It executes command `java -version` to see if it works
     pub fn is_available(&self) -> bool {
-        self.is_same_os() && Self::from_java_exe(&self.path).is_ok()
+        self.is_same_os() && Self::from_executable(&self.path).is_ok()
     }
 
     /// Parse version string
